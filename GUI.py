@@ -164,9 +164,24 @@ class MainWindow(qtw.QWidget):
         mainlayout.addWidget(self.entryfields, 3, 0, 1, 2)
     
         self.show()
+        self.initiate_user()
 
 
+    def initiate_user(self):
+        commence = qtw.QMessageBox()
+        commence.setIcon(qtw.QMessageBox.Question)
+        commence.setText("Is the test pin clear for zero-force initialization?")
+        commence.setWindowTitle("Force Cell Initialization")
+        commence.setStandardButtons(qtw.QMessageBox.Yes | qtw.QMessageBox.No)
+        commence.buttonClicked.connect(self.zero_cell)
+        commence.exec()
 
+
+    def zero_cell(self, i):
+        if i.text() == "&Yes":
+            print('clear')
+        else:
+            print('not clear')
 
 
     def th_test_initiate(self):
@@ -217,5 +232,7 @@ if __name__ == '__main__':
     UFT = MainWindow()
     UFT.setWindowIcon(g.QIcon('logo.png'))
     app.exec_()
+
+
 
 
