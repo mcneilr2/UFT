@@ -1,14 +1,59 @@
 import PyQt5.QtWidgets as qtw
 from PyQt5 import QtGui as g
+from PyQt5.QtCore import *
 import mysql.connector
 import qdarkstyle
 import threading
 import pandas as pd
 
+import ui_event_management as events
 
-class MainWindow(qtw.QWidget):
-    def __init__(self):
-        super().__init__()
+## Force user to clear the cell for zero-force initialization
+def EnforcePinClearWindow():
+        dialog = qtw.QDialog()
+        ##Main layout
+        mainlayout = qtw.QGridLayout()
+        dialog.setLayout(mainlayout)
+        dialog.setWindowTitle("Clear Testing Pin")
+        dialog.setGeometry(500,500,300,200)
+        dialog.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+
+        ##Sub layouts
+        radiobuttonlayout = qtw.QHBoxLayout()
+        displacementlayout = qtw.QFormLayout()
+        buttonlayout = qtw.QVBoxLayout()
+        
+        ##Extend/Retract Radio Buttons
+        extendbox = qtw.QRadioButton("Extend")
+        retractbox = qtw.QRadioButton("Retract")
+        extendbox.setChecked(True)
+        radiobuttonlayout.addWidget(extendbox)
+        radiobuttonlayout.addWidget(retractbox)
+        
+        ##Distance/Speed Fields
+        distance = qtw.QLineEdit()
+        distancelabel = qtw.QLabel("Displacement (mm):")
+        speed = qtw.QLineEdit()
+        speedlabel = qtw.QLabel("Speed (%):")
+        displacementlayout.addRow(distancelabel, distance)
+        displacementlayout.addRow(speedlabel, speed)
+
+        movebutton = qtw.QPushButton("Move", clicked = lambda: events.th_move())
+        homebutton = qtw.QPushButton("Retract Home", clicked = lambda: events.th_home())
+        clearbutton = qtw.QPushButton("Enter", clicked = startup_question)
+        buttonlayout.addWidget(movebutton)
+        buttonlayout.addWidget(homebutton)
+        buttonlayout.addWidget(clearbutton)
+
+        mainlayout.addLayout(radiobuttonlayout, 0, 0)
+        mainlayout.addLayout(displacementlayout, 1, 0)
+        mainlayout.addLayout(buttonlayout, 2, 0)
+
+        dialog.setWindowModality(Qt.ApplicationModal)
+        dialog.exec_()
+class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
+    def __init__(self):  ##Initialize instance
+        super().__init__()  ##Initialize parent classs
         self.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
 
         ######## Layout Management ########
@@ -54,16 +99,15 @@ class MainWindow(qtw.QWidget):
 
         ##Start/Stop Buttons
         #define the start/stop widgets
-        self.startbutton = qtw.QPushButton("Start Test", clicked = lambda: self.th_test_initiate())
+        self.startbutton = qtw.QPushButton("Start Test", clicked = lambda: events.th_test_initiate())
         #add the widgets to the leftbuttonlayout
         leftbuttonlayout.addWidget(self.startbutton)
         
         ##Force/Displ Display
         #define the display widgets
         self.forcereading = qtw.QLabel('0.0')
-        self.forcebutton = qtw.QPushButton("Display Force",  clicked = lambda: self.th_display_force())
+        self.forcebutton = qtw.QPushButton("Display Force",  clicked = lambda: events.th_display_force())
         
-
         #add the widgets to the displaylayout
         displaylayout.addWidget(self.forcebutton, 0, 0)
         displaylayout.addWidget(self.forcereading, 0, 1)
@@ -89,8 +133,8 @@ class MainWindow(qtw.QWidget):
 
         ##Move Button
         #define move button
-        self.movebutton = qtw.QPushButton("Move", clicked = lambda: self.th_move())
-        self.homebutton = qtw.QPushButton("Retract Home", clicked = lambda: self.th_home())
+        self.movebutton = qtw.QPushButton("Move", clicked = lambda: events.th_move())
+        self.homebutton = qtw.QPushButton("Retract Home", clicked = lambda: events.th_home())
         buttonlayout.addWidget(self.movebutton)
         buttonlayout.addWidget(self.homebutton)
 
@@ -108,7 +152,7 @@ class MainWindow(qtw.QWidget):
         support_label = qtw.QLabel("Support Factor (N/N):")
         self.firmness_l_calc = qtw.QLabel('')
         firmness_l_label = qtw.QLabel("Firmness (N):")
-        self.enterbutton = qtw.QPushButton("Record Results", clicked = lambda: self.th_commit())
+        self.enterbutton = qtw.QPushButton("Record Results", clicked = lambda: events.th_commit())
         
         
         #define tab layout
@@ -144,7 +188,7 @@ class MainWindow(qtw.QWidget):
 
         ## Tab3
         #define entry widgets for test tab
-        self.calibrate = qtw.QPushButton("Run Calibration", clicked = lambda: self.th_calibration())
+        self.calibrate = qtw.QPushButton("Run Calibration", clicked = lambda: events.th_calibration())
         #define tab layout
         tab3hbox.addWidget(self.calibrate, 0,0)
     
@@ -162,76 +206,65 @@ class MainWindow(qtw.QWidget):
         mainlayout.addLayout(displacementlayout, 1, 1)
         mainlayout.addLayout(buttonlayout, 2, 1)
         mainlayout.addWidget(self.entryfields, 3, 0, 1, 2)
-    
-        self.show()
-        self.initiate_user()
 
+    def click_all(self):
+        self.forcebutton.setEnabled(False)
+        self.startbutton.setEnabled(False)
+        self.movebutton.setEnabled(False) 
+        self.homebutton.setEnabled(False)
+        self.enterbutton.setEnabled(False)
 
-    def initiate_user(self):
-        commence = qtw.QMessageBox()
-        commence.setIcon(qtw.QMessageBox.Question)
-        commence.setText("Is the test pin clear for zero-force initialization?")
-        commence.setWindowTitle("Force Cell Initialization")
-        commence.setStandardButtons(qtw.QMessageBox.Yes | qtw.QMessageBox.No)
-        commence.buttonClicked.connect(self.zero_cell)
-        commence.exec()
+    def unclick_all(self):
+        print('unclicking')
+        self.forcebutton.setEnabled(True)
+        self.startbutton.setEnabled(True)
+        self.movebutton.setEnabled(True) 
+        self.homebutton.setEnabled(True)
+        self.enterbutton.setEnabled(True)
 
+def startup_question():
+    question = "Is the test pin clear for zero-force initialization?"
+    window_title = "Force Cell Initialization"
+    returnval = question_box(question, window_title, _)
+    return returnval
 
-    def zero_cell(self, i):
-        if i.text() == "&Yes":
-            print('clear')
-        else:
-            print('not clear')
+def _():
+    return
 
+########## Standardized question/warnings and greying out functions ###################
+def question_box(question, window_title, click_function):
+    commence = qtw.QMessageBox()
+    commence.setIcon(qtw.QMessageBox.Question)
+    commence.setText(question)
+    commence.setWindowTitle(window_title)
+    commence.setStandardButtons(qtw.QMessageBox.Yes | qtw.QMessageBox.No)
+    commence.buttonClicked.connect(click_function)
+    returnval = commence.exec()
+    return(returnval)
 
-    def th_test_initiate(self):
-        t_test_initiate=threading.Thread(target = self.test_initiate)
-        t_test_initiate.start()
-    def test_initiate(self):
-        print('test initiate')
-
-
-    def th_display_force(self):
-        t_display_force=threading.Thread(target = self.display_force)
-        t_display_force.start()
-    def display_force(self):
-        print('display force')
-
-
-    def th_move(self):
-        t_move=threading.Thread(target = self.move)
-        t_move.start()
-    def move(self):
-        print('move')
-
-
-    def th_home(self):
-        t_home=threading.Thread(target = self.home)
-        t_home.start()
-    def home(self):
-        print('home')
-
-
-    def th_commit(self):
-        t_commit=threading.Thread(target = self.commit)
-        t_commit.start()
-    def commit(self):
-        print('commit')
-
-
-    def th_calibration(self):
-        t_calibration=threading.Thread(target = self.calibrate)
-        t_calibration.start()
-    def calibrate(self):
-        print('calibrate')
-
-
+def warning_box(warning, window_title, click_function):
+    commence = qtw.QMessageBox()
+    commence.setIcon(qtw.QMessageBox.Warning)
+    commence.setText(warning)
+    commence.setWindowTitle(window_title)
+    commence.setStandardButtons(qtw.QMessageBox.Ok)
+    commence.buttonClicked.connect(click_function)
+    returnval = commence.exec()
+    return(returnval)
 
 if __name__ == '__main__':
-    app = qtw.QApplication([])
-    UFT = MainWindow()
-    UFT.setWindowIcon(g.QIcon('logo.png'))
-    app.exec_()
+    app = qtw.QApplication([])  ##Create QApplication instance
+    UFT = MainWindow()  ##Create Mainwindow (inherit from QtWidget) instance
+    UFT.setWindowIcon(g.QIcon('logo.png'))  ##Set the window logo
+    UFT.show()  ##Show the window
+    clear = False
+    check = startup_question()
+    while clear == False:
+        if check == 65536:
+            EnforcePinClearWindow()
+        elif check == 16384:
+            clear = True ##Trigger initialize function
+    app.exec_()  ##Initialize event loop
 
 
 
