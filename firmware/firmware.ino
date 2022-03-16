@@ -110,6 +110,8 @@ void go_the_distance(int pin_number, float mm, float speedvalue){
   steps = 0;
   travelled = 0;
   pos = 0;
+  int count = 0;
+
   
   if (pin_number == 10){
     do{
@@ -140,6 +142,11 @@ void go_the_distance(int pin_number, float mm, float speedvalue){
     analogWrite(10, 0);
     analogWrite(11, 0);
   }
+  do{
+  Serial.print("1");
+  count++;
+  }while(count < 10);
+ 
 }
 
 void force_stop(float threshold, float offset){
@@ -154,6 +161,7 @@ void force_stop(float threshold, float offset){
 //    delay(500);
     analogWrite(10, 0);
     analogWrite(11, 0);
+    Serial.print(scale.get_units());
 }
 
 
