@@ -21,4 +21,10 @@ class MCR():
         line_received = self.conn.readline().decode().strip()
         return line_received
 
+    def read(self, offset):
+        command = (''.join(('RF', str(0), ':', str(offset)))).encode()
+        self.conn.write(command) 
+        line_received = self.conn.readline().decode().strip()
+        return line_received
+
 
