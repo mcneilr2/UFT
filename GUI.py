@@ -139,7 +139,7 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
         self.tab1hbox.addWidget(firmness_l_label, 2, 2)
         self.tab1hbox.addWidget(self.firmness_l_calc, 2, 3)
         self.tab1hbox.addWidget(self.enterbutton, 3, 3)
-        self.tab1hbox.addWidget(self.thinking, 4,0,1,3)
+        self.tab1hbox.addWidget(self.thinking, 3,0,1,3)
         
         ## Tab2
         self.table = qtw.QTableWidget(10, 10)
@@ -199,7 +199,7 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
         if a.failout:
             self.warning_box("Check USB Connection", "Serial Connection Failure")
         elif a.failout == False:
-            time.sleep(1)
+            time.sleep(2)
             tare = a.zero_scale()
             if int(tare) < -46000 or int(tare) > -42000:
                 self.warning_box('Force Cell Requires Calibration', 'Maintenance Required')
