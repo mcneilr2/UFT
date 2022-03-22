@@ -67,16 +67,16 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
 
         ##Start/Stop Buttons
         #define the start/stop widgets
-        self.startbutton = qtw.QPushButton("Start Test", clicked = lambda: self.create_thread(self.test_start))
+        self.startbutton = qtw.QPushButton("Start Test", clicked = lambda: self.create_event_thread(self.test_start))
         #add the widgets to the leftbuttonlayout
         leftbuttonlayout.addWidget(self.startbutton)
         
         ##Force/Displ Display
         #define the display widgets
         self.forcereading = qtw.QLabel('0.0')
-        self.forcebutton = qtw.QPushButton("Display Force",  clicked = lambda: self.create_thread(self.display_force))
+        self.forcebutton = qtw.QPushButton("Display Force",  clicked = lambda: self.create_event_thread(self.display_force))
 
-        self.initializebutton = qtw.QPushButton("Zero Force Initialization",  clicked = lambda: self.create_thread(self.initialize))
+        self.initializebutton = qtw.QPushButton("Zero Force Initialization",  clicked = lambda: self.create_event_thread(self.initialize))
         
         #add the widgets to the displaylayout
         displaylayout.addWidget(self.forcebutton, 0, 0)
@@ -104,8 +104,8 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
 
         ##Move Button
         #define move button
-        self.movebutton = qtw.QPushButton("Move", clicked = lambda: self.create_thread(self.move))
-        self.homebutton = qtw.QPushButton("Retract Home", clicked = lambda: self.create_thread(self.home))
+        self.movebutton = qtw.QPushButton("Move", clicked = lambda: self.create_event_thread(self.move))
+        self.homebutton = qtw.QPushButton("Retract Home", clicked = lambda: self.create_event_thread(self.home))
         buttonlayout.addWidget(self.movebutton)
         buttonlayout.addWidget(self.homebutton)
 
@@ -121,8 +121,8 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
         th_label = qtw.QLabel("Thickness (mm):")
         self.support_calc = qtw.QLabel('')
         support_label = qtw.QLabel("Support Factor (N/N):")
-        self.firmness_l_calc = qtw.QLabel('')
-        firmness_l_label = qtw.QLabel("Firmness (N):")
+        self.firmness_calc = qtw.QLabel('')
+        firmness_label = qtw.QLabel("Firmness (N):")
         self.enterbutton = qtw.QPushButton("Record Results", clicked = lambda: events.th_commit())
         self.thinking = qtw.QProgressBar(self, textVisible=False, objectName = "BlueProgressBar")
     
@@ -137,8 +137,8 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
         self.tab1hbox.addWidget(self.th_entry, 0, 3)
         self.tab1hbox.addWidget(support_label, 1, 2)
         self.tab1hbox.addWidget(self.support_calc, 1, 3)
-        self.tab1hbox.addWidget(firmness_l_label, 2, 2)
-        self.tab1hbox.addWidget(self.firmness_l_calc, 2, 3)
+        self.tab1hbox.addWidget(firmness_label, 2, 2)
+        self.tab1hbox.addWidget(self.firmness_calc, 2, 3)
         self.tab1hbox.addWidget(self.enterbutton, 3, 3)
         self.tab1hbox.addWidget(self.thinking, 3,0,1,3)
         
@@ -190,149 +190,154 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
         self.homebutton.setEnabled(True)
         self.enterbutton.setEnabled(True)
 
-    def create_thread(self, test_funct):
-        thread_initialize=thr(target = test_funct)
-        thread_initialize.start()
-    
-    def waiting_loop(self, a):
+    def create_event_thread(self, test_funct):
+        self.thinking.setRange(0,0)
+        self.click_all()
+        a = events.MCR()
+        if a.failout:
+            warning_box("Check USB Connection", "Serial Connection Failure")
+            return
+        else:
+            if test_funct == self.move:
+                if not self.distance.text() or not self.speed.text():
+                    warning_box("Indicate speed/distance to move", "Requires Entry")
+                    self.unclick_all()
+                    self.thinking.setRange(0,1)
+                    a.conn.close()
+                    return
+                else: pass
+            if test_funct == self.test_start:
+                if self.testchoose.currentIndex() == 0:
+                    warning_box("Please select a test", "No test selected")
+                    self.unclick_all()
+                    self.thinking.setRange(0,1)
+                    a.conn.close()
+                    return
+                if not self.th_entry.text():
+                    warning_box("Please enter a sample thickness", "Sample thickness required")
+                    self.unclick_all()
+                    self.thinking.setRange(0,1)
+                    a.conn.close()
+                    return
+                else: pass
+            thread_initialize=thr(target = test_funct, args = (a,))
+            thread_initialize.start()
+
+    def create_serial_read_thread(self, a, waiting_function):
+        read_thread=thr(target = waiting_function, args=(a,))
+        read_thread.setDaemon(True)
+        read_thread.start()
+
+    def serial_wait(self, a):
         while a.conn.in_waiting == 0:
             pass
+        if self.another_step == True:
+            self.selected_test(a)
         self.unclick_all()
         self.thinking.setRange(0,1)
         a.conn.close()
         return
     
-    def initialize(self):
-        self.thinking.setRange(0,0)
-        a = events.MCR()
-        if a.failout:
-            self.warning_box("Check USB Connection", "Serial Connection Failure")
-        elif a.failout == False:
-            time.sleep(2)
-            self.tare = a.zero_scale()
-            if int(self.tare) < -46000 or int(self.tare) > -42000:
-                self.warning_box('Force Cell Requires Calibration', 'Maintenance Required')
-            else:
-                a.conn.close()
-                self.unclick_all()
-                self.initializebutton.setEnabled(False)
-                self.initializebutton.setText('Test Pin Ready')
-                self.thinking.setRange(0,1)
-
-    def display_force(self):
-        self.thinking.setRange(0,0)
-        a = events.MCR()
-        if a.failout:
-            self.warning_box("Check USB Connection", "Serial Connection Failure")
-        elif a.failout == False:
-            time.sleep(2)
-            offset = self.tare
-            for _ in range(4):
-                force = float(a.read(offset)) - a.perm_offset
-            self.forcereading.setText(str(round(force, 1)))
+    def initialize(self, a):
+        time.sleep(2)
+        self.another_step = False
+        self.tare = a.zero_scale()
+        print(self.tare)
+        if int(self.tare) < -46000 or int(self.tare) > -42000:
+            self.movebutton.setEnabled(True)
+            self.initializebutton.setText("CLEAR LOAD")
+            a.conn.close()
+            self.thinking.setRange(0,1)
+        else:
             a.conn.close()
             self.unclick_all()
+            self.initializebutton.setEnabled(False)
+            self.initializebutton.setText('Test Pin Ready')
             self.thinking.setRange(0,1)
 
-    def move(self):
+    def display_force(self, a):
+        time.sleep(2)
+        offset = self.tare
+        for _ in range(2):
+            force = float(a.read(offset)) - a.perm_offset
+        self.forcereading.setText(str(round(force, 1)))
+        a.conn.close()
+        self.unclick_all()
+        self.thinking.setRange(0,1)
+
+    def move(self, a):
         self.click_all()
         self.thinking.setRange(0,0)
-        a = events.MCR()
-        if a.failout:
-            self.warning_box("Check USB Connection", "Serial Connection Failure")
-        elif a.failout == False:
-            if not self.distance.text() or not self.speed.text():
-                self.warning_box("Indicate speed/distance to move", "Requires Entry")
-            else:
-                time.sleep(2)
+        time.sleep(2)
+        if self.extendbox.isChecked():
+            pin_number = a.extend
+        elif self.retractbox.isChecked():
+            pin_number = a.retract
+        travel = self.distance.text()
+        speed = (float(self.speed.text())/100)*255  ###Conversion to pwm cycle
+        self.create_serial_read_thread(a, self.serial_wait)
+        a.go_the_distance(pin_number, travel, speed)
+        return
 
-                read_thread=thr(target = self.waiting_loop, args=(a,))
-                read_thread.setDaemon(True)
-                read_thread.start()
+    def home(self, a):
+        time.sleep(2)
+        self.create_serial_read_thread(a, self.serial_wait)
+        a.go_home()
 
-                if self.extendbox.isChecked():
-                    pin_number = a.extend
-                elif self.retractbox.isChecked():
-                    pin_number = a.retract
-
-                travel = self.distance.text()
-                speed = (float(self.speed.text())/100)*255  ###Conversion to pwm cycle
-                a.go_the_distance(pin_number, travel, speed)
-                return
-
-    def home(self):
-        self.click_all()
-        self.thinking.setRange(0,0)
-        a = events.MCR()
-        if a.failout:
-            self.warning_box("Check USB Connection", "Serial Connection Failure")
-        elif a.failout == False:
-            time.sleep(2)
-            a.go_home()
-            a.conn.close()
-            self.unclick_all()
-            self.thinking.setRange(0,1)
-
-    def test_start(self):
+    def test_start(self, a):
         choice = self.testchoose.currentIndex()
         if choice == 0:
-            self.warning_box("Please select a test", "No test selected")
+            warning_box("Please select a test", "No test selected")
         elif choice == 1:
             self.selected_test = self.firmness_support
-            self.create_thread(self.force_stop(self.selected_test))
+            self.force_stop(a)
         elif choice == 2:
             self.selected_test = self.firmness
-            self.create_thread(self.force_stop(self.selected_test))
+            self.force_stop(a)
         elif choice == 3:
             self.selected_test = self.support
-            self.create_thread(self.force_stop(self.selected_test))
-
-    def force_stop(self, selected_test):
-        self.click_all()
-        self.thinking.setRange(0,0)
-        a = events.MCR()
-        if a.failout:
-            self.warning_box("Check USB Connection", "Serial Connection Failure")
-        elif a.failout == False:
-            time.sleep(2)
-            if not self.th_entry.text():
-                self.warning_box("Please enter a sample thickness", "Sample thickness required")
-                a.conn.close()
-                self.unclick_all()
-                self.thinking.setRange(0,1)
-            else:
-                self.tare = a.zero_scale()
-                a.force_stop(self.tare)
-                while True:
-                    print(a.conn.in_waiting)
-                
-    def firmness_support(self):
-        print('firmness and support test')
+            self.force_stop(a)
 
 
+    def force_stop(self, a):
+        time.sleep(2)
+        self.tare = a.zero_scale()
+        self.two_five_distance = 0.25*float(self.th_entry.text())
+        self.fourty_distance = 0.4*float(self.th_entry.text())
+        self.another_step = True
+        self.create_serial_read_thread(a, self.serial_wait)
+        a.force_stop(self.two_five_distance)
 
-    
-
+    def firmness(self, a):
+        print('in firmness')
+        for _ in range(2):
+            force = float(a.read(self.tare)) - a.perm_offset
+        self.firmness_calc.setText(str(round(force, 1)))
+        a.go_the_distance(a.retract, (self.fourty_distance*2), 255)
+        self.unclick_all()
+        self.thinking.setRange(0,1)
+        a.conn.close()
+        return
 
     ########## Standardized question/warnings ###################
-    def question_box(self,question, window_title, click_function):
-        commence = qtw.QMessageBox()
-        commence.setIcon(qtw.QMessageBox.Question)
-        commence.setText(question)
-        commence.setWindowTitle(window_title)
-        commence.setStandardButtons(qtw.QMessageBox.Yes | qtw.QMessageBox.No)
-        commence.buttonClicked.connect(click_function)
-        returnval = commence.exec()
-        return(returnval)
+def question_box(question, window_title, click_function):
+    commence = qtw.QMessageBox()
+    commence.setIcon(qtw.QMessageBox.Question)
+    commence.setText(question)
+    commence.setWindowTitle(window_title)
+    commence.setStandardButtons(qtw.QMessageBox.Yes | qtw.QMessageBox.No)
+    commence.buttonClicked.connect(click_function)
+    returnval = commence.exec()
+    return
 
-    def warning_box(self,warning, window_title):
-        commence = qtw.QMessageBox()
-        commence.setIcon(qtw.QMessageBox.Warning)
-        commence.setText(warning)
-        commence.setWindowTitle(window_title)
-        commence.setStandardButtons(qtw.QMessageBox.Ok)
-        returnval = commence.exec()
-        return(returnval)
+def warning_box(warning, window_title):
+    commence = qtw.QMessageBox()
+    commence.setIcon(qtw.QMessageBox.Warning)
+    commence.setText(warning)
+    commence.setWindowTitle(window_title)
+    commence.setStandardButtons(qtw.QMessageBox.Ok)
+    returnval = commence.exec()
+    return
 
 
 ########################### Check Serial Connection ########################################################
