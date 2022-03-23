@@ -215,8 +215,6 @@ void loop() {
             case 'W': // Write operation, e.g. WD3:1, WA8:255
                 if (mode == 'G'){
                     go_the_distance(pin_number, value_to_write, speedvalue);
-                } else if (mode == 'S'){
-                    stop_now();
                 } else if (mode == 'F'){
                     force_stop(value_to_write, speedvalue);
                 } else if (mode == 'H'){

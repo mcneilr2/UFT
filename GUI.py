@@ -1,4 +1,3 @@
-from pkgutil import extend_path
 import PyQt5.QtWidgets as qtw
 from PyQt5 import QtGui as g
 from PyQt5.QtCore import *
@@ -17,7 +16,6 @@ StyleSheet = '''
     background-color: #E0E0E0;
 }
 '''
-
 class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
     def __init__(self):  ##Initialize instance
         super().__init__()  ##Initialize parent classs
@@ -56,9 +54,6 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
         self.testchoose.addItem("Choose Test")
         self.testchoose.addItem("Support Factor +  Firmness")
         self.testchoose.addItem("Firmness")
-        self.testchoose.addItem("Support Factor")
-        # self.testchoose.addItem("Support Factor")
-        # self.testchoose.addItem("Hysteresis")
         test_l = qtw.QLabel('&Test:')
         test_l.setBuddy(self.testchoose)
         #add the widgets to the topboxlayout
@@ -123,7 +118,7 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
         support_label = qtw.QLabel("Support Factor (N/N):")
         self.firmness_calc = qtw.QLabel('')
         firmness_label = qtw.QLabel("Firmness (N):")
-        self.enterbutton = qtw.QPushButton("Record Results", clicked = lambda: events.th_commit())
+        self.enterbutton = qtw.QPushButton("Record Results", clicked = self.commit)
         self.thinking = qtw.QProgressBar(self, textVisible=False, objectName = "BlueProgressBar")
     
         #define tab layout
@@ -289,36 +284,100 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
         if choice == 0:
             warning_box("Please select a test", "No test selected")
         elif choice == 1:
-            self.selected_test = self.firmness_support
+            self.selected_test = self.support_move
             self.force_stop(a)
         elif choice == 2:
-            self.selected_test = self.firmness
+            self.selected_test = self.firmness_read
             self.force_stop(a)
-        elif choice == 3:
-            self.selected_test = self.support
-            self.force_stop(a)
-
 
     def force_stop(self, a):
         time.sleep(2)
         self.tare = a.zero_scale()
-        self.two_five_distance = 0.25*float(self.th_entry.text())
-        self.fourty_distance = 0.4*float(self.th_entry.text())
+        self.two_five_distance = round(0.25*float(self.th_entry.text()), 2)
+        self.fourty_distance = round(0.4*float(self.th_entry.text()), 2)
         self.another_step = True
         self.create_serial_read_thread(a, self.serial_wait)
         a.force_stop(self.two_five_distance)
 
-    def firmness(self, a):
-        print('in firmness')
+    def firmness_read(self, a):
         for _ in range(2):
-            force = float(a.read(self.tare)) - a.perm_offset
-        self.firmness_calc.setText(str(round(force, 1)))
-        a.go_the_distance(a.retract, (self.fourty_distance*2), 255)
+            self.two_five_force = float(a.read(self.tare)) - a.perm_offset
+        self.firmness_calc.setText(str(round(self.two_five_force, 1)))
+        self.another_step = False
+        a.go_the_distance(a.retract, (self.fourty_distance*5), 255)
+        self.unclick_all()
+        self.thinking.setRange(0,1)
+        a.conn.close()
+        return
+    
+    def support_move(self, a):
+        for _ in range(2):
+            self.two_five_force = float(a.read(self.tare)) - a.perm_offset
+        self.firmness_calc.setText(str(round(self.two_five_force, 1)))
+        self.another_step = False
+        a.go_the_distance(a.extend, self.fourty_distance, 255)
+        time.sleep(a.default_pausetime)
+        for _ in range(2):
+            self.fourty_force = float(a.read(self.tare)) - a.perm_offset
+        force = (float(self.fourty_force)-a.perm_offset)/(float(self.firmness_calc.text()))
+        self.support_calc.setText((str(round(force, 3))))
+        self.another_step = False
+        a.go_the_distance(a.retract, (self.fourty_distance*5), 255)
         self.unclick_all()
         self.thinking.setRange(0,1)
         a.conn.close()
         return
 
+    def commit(self):
+        print('in commit')
+        self.click_all()
+        self.thinking.setRange(0,0)
+        self.conn = mysql.connector.connect(host = 'localhost', user = 'root', passwd = 'password', database = 'foam')
+        c = self.conn.cursor()
+        if not self.sampleID_entry.text() or not self.date_entry.text() or not self.operator_name.text() or not self.th_entry.text():
+            print('in warning')
+            warning_box("Fill out all data before submitting",  "Missing Data")
+            c.close()
+            self.unclick_all()
+            self.thinking.setRange(0,1)
+        else:
+            sample_id = self.sampleID_entry.text()
+            test_date = self.date_entry.text()
+            operator = self.operator_name.text()
+            thickness = self.th_entry.text()
+            if self.firmness_calc.text():
+                test_name = 'firmness (N)'
+                entry = self.firmness_calc.text()
+                query = """INSERT INTO testing_results(sample_id, test_name,
+                result,test_date, operator, thickness) 
+                VALUES(%s, %s, %s, %s, %s, %s);"""
+                c.execute(query, (sample_id, test_name, entry, test_date, operator, thickness))
+                self.conn.commit()
+                self.firmness_calc.setText('')
+
+            if self.support_calc.text():
+                test_name = 'support factor (N/N)'
+                entry = self.support_calc.text()
+                query = """INSERT INTO testing_results(sample_id, test_name,
+                result,test_date, operator, thickness) 
+                VALUES(%s, %s, %s, %s, %s, %s);"""
+                c.execute(query, (sample_id, test_name, entry, test_date, operator, thickness))
+                self.conn.commit()
+                self.support_calc.setText('')
+
+        query = """select * from testing_results order by test_id desc"""
+        df = pd.read_sql(query, self.conn)
+        self.table.setHorizontalHeaderLabels(df.columns)
+        for row in df.iterrows():
+            values = row[1]
+            for col_index, value in enumerate(values):
+                tableItem = qtw.QTableWidgetItem(str(value))
+                self.table.setItem(row[0], col_index, tableItem)
+        c.close()
+        self.unclick_all()
+        self.thinking.setRange(0,1)
+        return
+        
     ########## Standardized question/warnings ###################
 def question_box(question, window_title, click_function):
     commence = qtw.QMessageBox()
@@ -338,10 +397,7 @@ def warning_box(warning, window_title):
     commence.setStandardButtons(qtw.QMessageBox.Ok)
     returnval = commence.exec()
     return
-
-
 ########################### Check Serial Connection ########################################################
-
 
 if __name__ == '__main__':
     app = qtw.QApplication([])  ##Create QApplication instance

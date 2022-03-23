@@ -1,6 +1,4 @@
-from threading import Thread as thr
 import serial
-import time
 
 class MCR():
     def __init__(self, serial_port='COM3', baud_rate=9600, read_timeout = 5 ):
@@ -12,6 +10,7 @@ class MCR():
         self.perm_offset = 14.9
         self.quarterspeed = 63.75
         self.default_forcestop = 2
+        self.default_pausetime = 5
 
         try:
             self.conn = serial.Serial(serial_port, baud_rate)
@@ -29,6 +28,13 @@ class MCR():
 
     def force_stop(self, two_five_distance):
         command = (''.join(('WF', str(0), ':',
+            str(self.default_forcestop), ':', str(two_five_distance)))).encode()
+        self.conn.write(command)
+        print(command)
+        return
+
+    def support(self, fourty_distance, two_five_distance):
+        command = (''.join(('WS', str(fourty_distance), ':',
             str(self.default_forcestop), ':', str(two_five_distance)))).encode()
         self.conn.write(command)
         print(command)
