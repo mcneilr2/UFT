@@ -30,14 +30,12 @@ class MCR():
         command = (''.join(('WF', str(0), ':',
             str(self.default_forcestop), ':', str(two_five_distance)))).encode()
         self.conn.write(command)
-        print(command)
         return
 
     def support(self, fourty_distance, two_five_distance):
         command = (''.join(('WS', str(fourty_distance), ':',
             str(self.default_forcestop), ':', str(two_five_distance)))).encode()
         self.conn.write(command)
-        print(command)
         return
 
     def read(self, offset):

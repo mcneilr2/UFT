@@ -39,47 +39,6 @@ void tare_read(){
   Serial.print(scale.get_offset()); 
 }
 
-//void calib(float spring){
-//  scale.tare();
-//    
-//    do{
-//      analogWrite(10, 0);
-//      analogWrite(11, 20);
-//    }while(scale.get_units() < 0.5);
-//    analogWrite(10, 0);
-//    analogWrite(11, 0);
-//  delay(1000);
-//  steps = 0;
-//  travelled = 0;
-//  pos = 0;
-//    do{
-//      analogWrite(10, 0);
-//      analogWrite(11, 50);
-//      if(millis() - prevTimer > 100){  //update every 1/10 of a second
-//        pos = pos + steps;
-//        travelled = conNum * pos;
-//        steps = 0;
-//        prevTimer = millis();
-//      }
-//    }while(travelled <= 40.5);
-//    analogWrite(10, 0);
-//    analogWrite(11, 0);
-//
-//    do{
-//      scale.set_scale(calibration_factor);
-//      Serial.print("\nforce read: ");
-//      Serial.print(scale.get_units());
-//      Serial.print("\ncalib read: ");
-//      Serial.print(calibration_factor);
-//      if (scale.get_units(5) < 100){calibration_factor += 20;}
-//      else if (scale.get_units(5) > 102) {calibration_factor -= 20;}
-//    }while ((scale.get_units()<100) || (scale.get_units()>102));
-//
-//    Serial.print("\nfinal calib: ");
-//    Serial.print(calibration_factor);
-//  }
-//
-
 void read_force(float offset){
   scale.set_offset(offset);
   Serial.print(scale.get_units()); 
@@ -219,8 +178,6 @@ void loop() {
                     force_stop(value_to_write, speedvalue);
                 } else if (mode == 'H'){
                     homeActuator();
-//                } else if (mode == 'C'){
-//                    calib(value_to_write);
                 } else {
                     break; // Unexpected mode
                 }
