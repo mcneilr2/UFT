@@ -4,9 +4,9 @@ A full-stack software for control and automation of a universal tensile testing 
 
 The current version I am working on utilizes a local MySQL database with the following credentials:
 
-'''
+```
  conn = mysql.connector.connect(host = 'localhost', user = 'root', passwd = 'password', database = 'foam')
- '''
+```
 
 # Table of Contents
 
