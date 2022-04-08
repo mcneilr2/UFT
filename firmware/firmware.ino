@@ -129,7 +129,7 @@ void force_stop(float threshold, float two_five_distance){
 //    
     
     delay(2000);
-    go_the_distance(extend,two_five_distance,127);
+    go_the_distance(extend,two_five_distance,65);
     delay(5000);
     
 }

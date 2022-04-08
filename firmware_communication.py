@@ -9,7 +9,7 @@ class MCR():
         self.retract = 10
         self.perm_offset = 14.9
         self.quarterspeed = 63.75
-        self.default_forcestop = 2
+        self.default_forcestop =2
         self.default_pausetime = 5
 
         try:
