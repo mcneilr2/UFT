@@ -6,6 +6,7 @@ import qdarkstyle
 from threading import Thread as thr
 import pandas as pd
 import time
+import sqlite3
 
 import firmware_communication as events
 
@@ -143,15 +144,20 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
         #define back end widgets
         tab2hbox.setContentsMargins(5, 5, 5, 5)
         tab2hbox.addWidget(self.table)
-        conn = mysql.connector.connect(host = 'localhost', user = 'root', passwd = 'password', database = 'foam')
-        query = """select * from testing_results order by test_id desc"""
-        df = pd.read_sql(query, conn)
-        self.table.setHorizontalHeaderLabels(df.columns)
-        for row in df.iterrows():
-            values = row[1]
-            for col_index, value in enumerate(values):
-                tableItem = qtw.QTableWidgetItem(str(value))
-                self.table.setItem(row[0], col_index, tableItem)
+        try:
+            conn = sqlite3.connect('foam_local.db')
+        except:
+            warning_box('Database Not Connected', 'Database Error')
+            conn = None
+        else:
+            cur = conn.cursor()
+            cur.execute("""select * from tests_local order by test_id desc""")
+            df = cur.fetchall()
+            self.table.setHorizontalHeaderLabels(["Test ID", "Test Name", "Result", "Date", "Operator", "Thickness", "Sample ID"])
+            for i, row in enumerate(df):
+                for j, x in enumerate(row):
+                    tableItem = qtw.QTableWidgetItem(str(x))
+                    self.table.setItem(i, j, tableItem)
     
         #add tabs to widget
         self.entryfields.addTab(tab1, "&Test Results")
@@ -329,53 +335,53 @@ class MainWindow(qtw.QWidget):   ##Inherit QtWidget parent class
         return
 
     def commit(self):
-        print('in commit')
         self.click_all()
         self.thinking.setRange(0,0)
-        self.conn = mysql.connector.connect(host = 'localhost', user = 'root', passwd = 'password', database = 'foam')
-        c = self.conn.cursor()
-        if not self.sampleID_entry.text() or not self.date_entry.text() or not self.operator_name.text() or not self.th_entry.text():
-            print('in warning')
-            warning_box("Fill out all data before submitting",  "Missing Data")
-            c.close()
-            self.unclick_all()
-            self.thinking.setRange(0,1)
+        try:
+            conn = sqlite3.connect('foam_local.db')
+        except:
+            warning_box('Database Not Connected', 'Database Error')
+            conn = None
         else:
-            sample_id = self.sampleID_entry.text()
-            test_date = self.date_entry.text()
-            operator = self.operator_name.text()
-            thickness = self.th_entry.text()
-            if self.firmness_calc.text():
-                test_name = 'firmness (N)'
-                entry = self.firmness_calc.text()
-                query = """INSERT INTO testing_results(sample_id, test_name,
-                result,test_date, operator, thickness) 
-                VALUES(%s, %s, %s, %s, %s, %s);"""
-                c.execute(query, (sample_id, test_name, entry, test_date, operator, thickness))
-                self.conn.commit()
-                self.firmness_calc.setText('')
+            c = conn.cursor()
+            if not self.sampleID_entry.text() or not self.date_entry.text() or not self.operator_name.text() or not self.th_entry.text():
+                warning_box("Fill out all data before submitting",  "Missing Data")
+                c.close()
+                self.unclick_all()
+                self.thinking.setRange(0,1)
+            else:
+                sample_id = self.sampleID_entry.text()
+                test_date = self.date_entry.text()
+                operator = self.operator_name.text()
+                thickness = self.th_entry.text()
+                if self.firmness_calc.text():
+                    test_name = 'firmness (N)'
+                    entry = self.firmness_calc.text()
+                    query = """INSERT INTO tests_local(sample_id, test_name_local,
+                    result_local,test_date_local, operator_local, thickness_local) 
+                    VALUES(?, ?, ?, ?, ?, ?);"""
+                    c.execute(query, (sample_id, test_name, entry, test_date, operator, thickness))
+                    self.firmness_calc.setText('')
 
-            if self.support_calc.text():
-                test_name = 'support factor (N/N)'
-                entry = self.support_calc.text()
-                query = """INSERT INTO testing_results(sample_id, test_name,
-                result,test_date, operator, thickness) 
-                VALUES(%s, %s, %s, %s, %s, %s);"""
-                c.execute(query, (sample_id, test_name, entry, test_date, operator, thickness))
-                self.conn.commit()
-                self.support_calc.setText('')
+                if self.support_calc.text():
+                    test_name = 'support factor (N/N)'
+                    entry = self.support_calc.text()
+                    query = """INSERT INTO tests_local(sample_id, test_name_local,
+                    result_local,test_date_local, operator_local, thickness_local) 
+                    VALUES(?, ?, ?, ?, ?, ?);"""
+                    c.execute(query, (sample_id, test_name, entry, test_date, operator, thickness))
+                    self.support_calc.setText('')
 
-        query = """select * from testing_results order by test_id desc"""
-        df = pd.read_sql(query, self.conn)
-        self.table.setHorizontalHeaderLabels(df.columns)
-        for row in df.iterrows():
-            values = row[1]
-            for col_index, value in enumerate(values):
-                tableItem = qtw.QTableWidgetItem(str(value))
-                self.table.setItem(row[0], col_index, tableItem)
-        c.close()
-        self.unclick_all()
-        self.thinking.setRange(0,1)
+                c.execute("""select * from tests_local order by test_id desc""")
+                df = c.fetchall()
+                self.table.setHorizontalHeaderLabels(["Test ID", "Test Name", "Result", "Date", "Operator", "Thickness", "Sample ID"])
+                for i, row in enumerate(df):
+                    for j, x in enumerate(row):
+                        tableItem = qtw.QTableWidgetItem(str(x))
+                        self.table.setItem(i, j, tableItem)
+                c.close()
+                self.unclick_all()
+                self.thinking.setRange(0,1)
         return
         
     ########## Standardized question/warnings ###################
