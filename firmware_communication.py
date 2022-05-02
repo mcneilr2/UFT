@@ -1,7 +1,7 @@
 import serial
 
 class MCR():
-    def __init__(self, serial_port='COM3', baud_rate=9600, read_timeout = 5 ):
+    def __init__(self, serial_port='COM4', baud_rate=9600, read_timeout = 5 ):
         """
         Initializes the serial connection to the Arduino board
         """
